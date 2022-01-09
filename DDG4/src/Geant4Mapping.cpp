@@ -73,6 +73,7 @@ void Geant4Mapping::attach(Geant4GeometryInfo* data_ptr) {
 Geant4VolumeManager Geant4Mapping::volumeManager() const {
   if ( m_dataPtr ) {
     if ( m_dataPtr->g4Paths.empty() ) {
+      printout(WARNING, "Geant4Mapping", "+++ JIZHONGLING before Geant4VolumeManager().");
       return Geant4VolumeManager(m_detDesc, m_dataPtr);
     }
     return Geant4VolumeManager(Handle < Geant4GeometryInfo > (m_dataPtr));
