@@ -39,6 +39,14 @@ using namespace std;
 typedef pair<VolumeID,vector<pair<const BitFieldElement*, VolumeID> > > VolIDDescriptor;
 namespace {
 
+  inline size_t path_vector_hash(const vector<const G4VPhysicalVolume*>& path_vector) {
+    string hash_string("");
+    for(const auto& i : path_vector) {
+      hash_string += to_string(reinterpret_cast<uint64_t>(i));
+    }
+    return hash<string>{}(hash_string);
+  }
+
   /// Helper class to populate the Geant4 volume manager
   struct Populator {
     typedef vector<const TGeoNode*> Chain;
@@ -162,8 +170,9 @@ namespace {
           path.erase(path.begin()+path.size()-1);
           printout(print_res, "Geant4VolumeManager", "+++     Map %016X to Geant4 Path:%s",
                    (void*)code, Geant4GeometryInfo::placementPath(path).c_str());
-          if (m_geo.g4Paths.find(path) == m_geo.g4Paths.end()) {
-            m_geo.g4Paths[path] = code;
+          auto path_hash = path_vector_hash(path);
+          if (m_geo.g4Paths.find(path_hash) == m_geo.g4Paths.end()) {
+            m_geo.g4Paths[path_hash] = code;
             //m_entries.emplace(code,path);
             s_entries.emplace(code);
             //printout(print_res, "add_entry", "+++ JIZHONGLING m_entries.size() = %i*%i, m_geo.g4Paths.size() = %i*%i.",
@@ -235,7 +244,7 @@ bool Geant4VolumeManager::checkValidity() const {
 VolumeID Geant4VolumeManager::volumeID(const vector<const G4VPhysicalVolume*>& path) const {
   if (!path.empty() && checkValidity()) {
     const auto& mapping = ptr()->g4Paths;
-    auto i = mapping.find(path);
+    auto i = mapping.find(path_vector_hash(path));
     if (i != mapping.end())
       return (*i).second;
     if (!path[0])
@@ -262,7 +271,7 @@ void Geant4VolumeManager::volumeDescriptor(const vector<const G4VPhysicalVolume*
   vol_desc.first = NonExisting;
   if (!path.empty() && checkValidity()) {
     const auto& mapping = ptr()->g4Paths;
-    auto i = mapping.find(path);
+    auto i = mapping.find(path_vector_hash(path));
     if (i != mapping.end()) {
       VolumeID vid = (*i).second;
       G4LogicalVolume* lvol = path[0]->GetLogicalVolume();
