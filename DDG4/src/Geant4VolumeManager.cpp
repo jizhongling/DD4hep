@@ -54,6 +54,8 @@ namespace {
     const Detector& m_detDesc;
     /// Set of already added entries
     set<VolumeID> s_entries;
+    /// Set of already added encodings
+    set<VolumeID> s_encodings;
     /// Reference to Geant4 translation information
     Geant4GeometryInfo& m_geo;
 
@@ -73,6 +75,7 @@ namespace {
           SensitiveDetector sd;
           PlacedVolume::VolIDs ids;
           s_entries.clear();
+          s_encodings.clear();
           chain.emplace_back(m_detDesc.world().placement().ptr());
           printout(WARNING, "Geant4VolumeManager", "+++ JIZHONGLING before scanPhysicalVolume().");
           scanPhysicalVolume(pv.ptr(), ids, sd, chain);
@@ -126,18 +129,30 @@ namespace {
       PrintLevel print_chain  = print_level;
       PrintLevel print_res    = print_level;
 
-      printout(print_action,"Geant4VolumeManager","+++ Add path:%s vid:%016X",
-               detail::tools::placementPath(nodes,false).c_str(),code);
+      PlacedVolume::VolIDs encodings;
+      for (const auto& id: ids) {
+        printout(print_chain, "Geant4VolumeManager", "+++ JIZHONGLING VolID: %s, %d.", id.first.c_str(), id.second);
+        if (id.first.front() != '~')
+          encodings.emplace_back(id);
+      }
+      VolumeID encoded = iddesc.encode(encodings);
+      set<VolumeID>::const_iterator j = s_encodings.find(encoded);
 
-      if (i == s_entries.end()) {
+      printout(print_action,"Geant4VolumeManager","+++ Add path:%s vid:%016X",
+               detail::tools::placementPath(nodes,false).c_str(),encoded);
+
+      if (j == s_encodings.end() && i == s_entries.end()) {
         path.reserve(nodes.size());
         for (Chain::const_reverse_iterator k = nodes.rbegin(), kend=nodes.rend(); k != kend; ++k) {
           node = *(k);
           PlacementMap::const_iterator g4pit = m_geo.g4Placements.find(node);
           if (g4pit != m_geo.g4Placements.end()) {
-            path.emplace_back((*g4pit).second);
-            printout(print_chain, "Geant4VolumeManager", "+++     Chain: Node OK: %s [%s]",
-                     node->GetName(), (*g4pit).second->GetName().c_str());
+            printout(print_chain, "Geant4VolumeManager", "+++ JIZHONGLING TGeoNode name: %s.", (*g4pit).first->GetName());
+            if ((*g4pit).first->GetName()[0] != '~') {
+              path.emplace_back((*g4pit).second);
+              printout(print_chain, "Geant4VolumeManager", "+++     Chain: Node OK: %s [%s]",
+                       node->GetName(), (*g4pit).second->GetName().c_str());
+            }
             continue;
           }
           control.insert(control.begin(),node);
@@ -161,13 +176,17 @@ namespace {
         }
         if ( control.empty() )   {
           printout(print_res, "Geant4VolumeManager", "+++     Volume  IDs:%s",
-                   detail::tools::toString(ro.idSpec(),ids,code).c_str());
+                   detail::tools::toString(ro.idSpec(),ids,encoded).c_str());
           path.erase(path.begin()+path.size()-1);
           printout(print_res, "Geant4VolumeManager", "+++     Map %016X to Geant4 Path:%s",
-                   (void*)code, Geant4GeometryInfo::placementPath(path).c_str());
+                   (void*)encoded, Geant4GeometryInfo::placementPath(path).c_str());
           auto path_hash = path_vector_hash(path);
           if (m_geo.g4Paths.find(path_hash) == m_geo.g4Paths.end()) {
-            m_geo.g4Paths[path_hash] = code;
+            printout(print_chain, "Geant4VolumeManager", "+++ JIZHONGLING G4VPhysicalVolume name:");
+            for (const auto& p : path)
+              printout(print_chain, "Geant4VolumeManager", "+++ %s", p->GetName().c_str());
+            m_geo.g4Paths[path_hash] = encoded;
+            s_encodings.emplace(encoded);
             s_entries.emplace(code);
             printout(print_res, "Geant4VolumeManager", "+++ s_entries.size() = %d*%d, m_geo.g4Paths.size() = %d*([%d|%d*%d]+%d).",
                 s_entries.size(), sizeof(VolumeID), m_geo.g4Paths.size(), sizeof(size_t),
@@ -181,6 +200,10 @@ namespace {
         printout(INFO, "Geant4VolumeManager", "Control block has still %d entries:%s",
                  int(control.size()),detail::tools::placementPath(control,true).c_str());
         goto Err;
+      }
+      else if (i == s_entries.end()) {
+        s_entries.emplace(code);
+        return;
       }
       printout(ERROR, "Geant4VolumeManager", "populate: Severe error: Duplicated Volume entry: 0x%X"
                " [THIS SHOULD NEVER HAPPEN]", code);
@@ -236,8 +259,15 @@ bool Geant4VolumeManager::checkValidity() const {
 /// Access CELLID by placement path
 VolumeID Geant4VolumeManager::volumeID(const vector<const G4VPhysicalVolume*>& path) const {
   if (!path.empty() && checkValidity()) {
+    Geant4GeometryInfo::Geant4PlacementPath encode_path;
+    printout(DEBUG, "Geant4VolumeManager", "+++ JIZHONGLING G4VPhysicalVolume name:");
+    for (const auto& p : path) {
+      printout(DEBUG, "Geant4VolumeManager", "+++ %s", p->GetName().c_str());
+      if (p->GetName()[0] != '~')
+        encode_path.emplace_back(p);
+    }
     const auto& mapping = ptr()->g4Paths;
-    auto i = mapping.find(path_vector_hash(path));
+    auto i = mapping.find(path_vector_hash(encode_path));
     if (i != mapping.end())
       return (*i).second;
     if (!path[0])
