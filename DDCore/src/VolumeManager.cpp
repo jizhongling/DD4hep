@@ -329,7 +329,7 @@ const TGeoHMatrix& VolumeManagerContext::toElement()  const   {
 
 /// Initializing constructor to create a new object
 VolumeManager::VolumeManager(const Detector& description, const string& nam, DetElement elt, Readout ro, int flags) {
-  printout(INFO, "VolumeManager", " - populating volume ids - be patient ..."  );
+  printout(WARNING, "VolumeManager", "JIZHONGLING - populating volume ids - be patient ..."  );
   size_t node_count = 0;
   Object* obj_ptr = new Object();
   assign(obj_ptr, nam, "VolumeManager");
@@ -342,7 +342,7 @@ VolumeManager::VolumeManager(const Detector& description, const string& nam, Det
     p.populate(elt);
     node_count = p.numNodes();
   }
-  printout(INFO, "VolumeManager", " - populating volume ids - done. %ld nodes.",node_count);
+  printout(WARNING, "VolumeManager", "JIZHONGLING - populating volume ids - done. %ld nodes.",node_count);
 }
 
 /// Initializing constructor to create a new object

@@ -50,11 +50,9 @@ namespace {
   /// Helper class to populate the Geant4 volume manager
   struct Populator {
     typedef vector<const TGeoNode*> Chain;
-    typedef map<VolumeID,Geant4GeometryInfo::Geant4PlacementPath> Registries;
     /// Reference to the Detector instance
     const Detector& m_detDesc;
     /// Set of already added entries
-    Registries m_entries;
     set<VolumeID> s_entries;
     /// Reference to Geant4 translation information
     Geant4GeometryInfo& m_geo;
@@ -74,12 +72,11 @@ namespace {
           Chain chain;
           SensitiveDetector sd;
           PlacedVolume::VolIDs ids;
-          m_entries.clear();
           s_entries.clear();
           chain.emplace_back(m_detDesc.world().placement().ptr());
-          printout(WARNING, "populate", "+++ JIZHONGLING before scanPhysicalVolume().");
+          printout(WARNING, "Geant4VolumeManager", "+++ JIZHONGLING before scanPhysicalVolume().");
           scanPhysicalVolume(pv.ptr(), ids, sd, chain);
-          printout(WARNING, "populate", "+++ JIZHONGLING after scanPhysicalVolume().");
+          printout(WARNING, "Geant4VolumeManager", "+++ JIZHONGLING after scanPhysicalVolume().");
           continue;
         }
         printout(WARNING, "Geant4VolumeManager", "++ Detector element %s of type %s has no placement.", de.name(), de.type().c_str());
@@ -123,9 +120,8 @@ namespace {
       Readout ro = sd.readout();
       IDDescriptor iddesc = ro.idSpec();
       VolumeID code = iddesc.encode(ids);
-      //Registries::const_iterator i = m_entries.find(code);
       set<VolumeID>::const_iterator i = s_entries.find(code);
-      PrintLevel print_level  = m_geo.printLevel;
+      PrintLevel print_level  = DEBUG;
       PrintLevel print_action = print_level;
       PrintLevel print_chain  = print_level;
       PrintLevel print_res    = print_level;
@@ -133,7 +129,6 @@ namespace {
       printout(print_action,"Geant4VolumeManager","+++ Add path:%s vid:%016X",
                detail::tools::placementPath(nodes,false).c_str(),code);
 
-      //if (i == m_entries.end()) {
       if (i == s_entries.end()) {
         path.reserve(nodes.size());
         for (Chain::const_reverse_iterator k = nodes.rbegin(), kend=nodes.rend(); k != kend; ++k) {
@@ -173,10 +168,10 @@ namespace {
           auto path_hash = path_vector_hash(path);
           if (m_geo.g4Paths.find(path_hash) == m_geo.g4Paths.end()) {
             m_geo.g4Paths[path_hash] = code;
-            //m_entries.emplace(code,path);
             s_entries.emplace(code);
-            //printout(print_res, "add_entry", "+++ JIZHONGLING m_entries.size() = %i*%i, m_geo.g4Paths.size() = %i*%i.",
-            //    m_entries.size(), sizeof(m_entries[code]), m_geo.g4Paths.size(), sizeof(m_geo.g4Paths[path]));
+            printout(print_res, "Geant4VolumeManager", "+++ s_entries.size() = %d*%d, m_geo.g4Paths.size() = %d*([%d|%d*%d]+%d).",
+                s_entries.size(), sizeof(VolumeID), m_geo.g4Paths.size(), sizeof(size_t),
+                path.size(), sizeof(G4VPhysicalVolume*), sizeof(VolumeID));
             return;
           }
           printout(ERROR, "Geant4VolumeManager", "populate: Severe error: Duplicated Geant4 path!!!! %s %s",
@@ -191,10 +186,8 @@ namespace {
                " [THIS SHOULD NEVER HAPPEN]", code);
 
     Err:
-      //if ( i != m_entries.end() )
       if ( i != s_entries.end() )
-        //printout(ERROR,"Geant4VolumeManager"," Known G4 path: %s",Geant4GeometryInfo::placementPath((*i).second).c_str());
-        printout(ERROR,"Geant4VolumeManager"," Known G4 path: JIZHONGLING");
+        printout(ERROR,"Geant4VolumeManager"," Known G4 code: %lld",*i);
       if ( !path.empty() )
         printout(ERROR,"Geant4VolumeManager"," New   G4 path: %s",Geant4GeometryInfo::placementPath(path).c_str());
       if ( !nodes.empty() )
