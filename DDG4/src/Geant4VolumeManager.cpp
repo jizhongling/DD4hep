@@ -46,8 +46,6 @@ namespace {
     const Detector& m_detDesc;
     /// Set of already added entries
     set<VolumeID> s_entries;
-    /// Set of already added encodings
-    set<VolumeID> s_encodings;
     /// Reference to Geant4 translation information
     Geant4GeometryInfo& m_geo;
 
@@ -67,7 +65,6 @@ namespace {
           SensitiveDetector sd;
           PlacedVolume::VolIDs ids;
           s_entries.clear();
-          s_encodings.clear();
           chain.emplace_back(m_detDesc.world().placement().ptr());
           scanPhysicalVolume(pv.ptr(), ids, sd, chain);
           continue;
@@ -112,23 +109,25 @@ namespace {
       Geant4GeometryInfo::Geant4PlacementPath path;
       Readout ro = sd.readout();
       IDDescriptor iddesc = ro.idSpec();
-      VolumeID code = iddesc.encode(ids);
-      set<VolumeID>::const_iterator i = s_entries.find(code);
-      PlacedVolume::VolIDs encodings;
-      for (const auto& id: ids)
+      PlacedVolume::VolIDs encode_ids;
+      bool is_virtual = false;
+      for (const auto& id : ids) {
         if (id.first.front() != '~')
-          encodings.emplace_back(id);
-      VolumeID encoded = iddesc.encode(encodings);
-      set<VolumeID>::const_iterator j = s_encodings.find(encoded);
+          encode_ids.emplace_back(id);
+        else
+          is_virtual = true;
+      }
+      VolumeID code = iddesc.encode(encode_ids);
+      set<VolumeID>::const_iterator i = s_entries.find(code);
       PrintLevel print_level  = m_geo.printLevel;
       PrintLevel print_action = print_level;
       PrintLevel print_chain  = print_level;
       PrintLevel print_res    = print_level;
 
       printout(print_action,"Geant4VolumeManager","+++ Add path:%s vid:%016X",
-               detail::tools::placementPath(nodes,false).c_str(),encoded);
+               detail::tools::placementPath(nodes,false).c_str(),code);
 
-      if (j == s_encodings.end() && i == s_entries.end()) {
+      if (i == s_entries.end()) {
         path.reserve(nodes.size());
         for (Chain::const_reverse_iterator k = nodes.rbegin(), kend=nodes.rend(); k != kend; ++k) {
           node = *(k);
@@ -162,13 +161,12 @@ namespace {
         }
         if ( control.empty() )   {
           printout(print_res, "Geant4VolumeManager", "+++     Volume  IDs:%s",
-                   detail::tools::toString(ro.idSpec(),ids,encoded).c_str());
+                   detail::tools::toString(ro.idSpec(),ids,code).c_str());
           path.erase(path.begin()+path.size()-1);
           printout(print_res, "Geant4VolumeManager", "+++     Map %016X to Geant4 Path:%s",
-                   (void*)encoded, Geant4GeometryInfo::placementPath(path).c_str());
+                   (void*)code, Geant4GeometryInfo::placementPath(path).c_str());
           if (m_geo.g4Paths.find(path) == m_geo.g4Paths.end()) {
-            m_geo.g4Paths[path] = encoded;
-            s_encodings.emplace(encoded);
+            m_geo.g4Paths[path] = code;
             s_entries.emplace(code);
             return;
           }
@@ -180,10 +178,8 @@ namespace {
                  int(control.size()),detail::tools::placementPath(control,true).c_str());
         goto Err;
       }
-      else if (i == s_entries.end()) {
-        s_entries.emplace(code);
+      else if (is_virtual)
         return;
-      }
       printout(ERROR, "Geant4VolumeManager", "populate: Severe error: Duplicated Volume entry: 0x%X"
                " [THIS SHOULD NEVER HAPPEN]", code);
 
