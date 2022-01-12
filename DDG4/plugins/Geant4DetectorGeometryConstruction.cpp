@@ -177,9 +177,7 @@ void Geant4DetectorGeometryConstruction::constructGeo(Geant4DetectorConstruction
   // Save away the reference to the world volume
   context()->kernel().setWorld(w);
   // Create Geant4 volume manager only if not yet available
-  printout(WARNING, "Geant4DetectorGeometryConstruction", "+++ JIZHONGLING before g4map.volumeManager().");
   g4map.volumeManager();
-  printout(WARNING, "Geant4DetectorGeometryConstruction", "+++ JIZHONGLING after g4map.volumeManager().");
   if ( m_dumpHierarchy != 0 )   {
     Geant4HierarchyDump dmp(ctxt->description, m_dumpHierarchy);
     dmp.dump("",w);

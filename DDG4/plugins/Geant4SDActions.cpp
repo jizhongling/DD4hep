@@ -405,7 +405,7 @@ namespace dd4hep {
                 contrib.deposit,pos.X,pos.Y,pos.Z,handler.path().c_str());
         if ( 0 == hit->cellID )  { // for debugging only!
           hit->cellID = cellID(step);
-          except("+++ JIZHONGLING Invalid CELL ID for hit!");
+          except("+++ Invalid CELL ID for hit!");
         }
       }
       hit->truth.emplace_back(contrib);

@@ -118,7 +118,7 @@ namespace dd4hep {
       std::map<Region, G4Region*>                              g4Regions;
       std::map<VisAttr, G4VisAttributes*>                      g4Vis;
       std::map<LimitSet, G4UserLimits*>                        g4Limits;
-      std::map<size_t, VolumeID>                               g4Paths;
+      std::map<Geant4PlacementPath, VolumeID>                  g4Paths;
       std::map<SensitiveDetector,std::set<const TGeoVolume*> > sensitives;
       std::map<Region,           std::set<const TGeoVolume*> > regions;
       std::map<LimitSet,         std::set<const TGeoVolume*> > limits;
