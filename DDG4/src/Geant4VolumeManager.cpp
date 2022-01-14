@@ -42,10 +42,11 @@ namespace {
   /// Helper class to populate the Geant4 volume manager
   struct Populator {
     typedef vector<const TGeoNode*> Chain;
+    typedef map<VolumeID,Geant4GeometryInfo::Geant4PlacementPath> Registries;
     /// Reference to the Detector instance
     const Detector& m_detDesc;
     /// Set of already added entries
-    set<VolumeID> s_entries;
+    Registries m_entries;
     /// Reference to Geant4 translation information
     Geant4GeometryInfo& m_geo;
 
@@ -64,7 +65,7 @@ namespace {
           Chain chain;
           SensitiveDetector sd;
           PlacedVolume::VolIDs ids;
-          s_entries.clear();
+          m_entries.clear();
           chain.emplace_back(m_detDesc.world().placement().ptr());
           scanPhysicalVolume(pv.ptr(), ids, sd, chain);
           continue;
@@ -112,13 +113,13 @@ namespace {
       PlacedVolume::VolIDs encode_ids;
       bool is_virtual = false;
       for (const auto& id : ids) {
-        if (id.first.front() != '~')
+        if (id.first[0] != '~')
           encode_ids.emplace_back(id);
         else
           is_virtual = true;
       }
       VolumeID code = iddesc.encode(encode_ids);
-      set<VolumeID>::const_iterator i = s_entries.find(code);
+      Registries::const_iterator i = m_entries.find(code);
       PrintLevel print_level  = m_geo.printLevel;
       PrintLevel print_action = print_level;
       PrintLevel print_chain  = print_level;
@@ -127,7 +128,7 @@ namespace {
       printout(print_action,"Geant4VolumeManager","+++ Add path:%s vid:%016X",
                detail::tools::placementPath(nodes,false).c_str(),code);
 
-      if (i == s_entries.end()) {
+      if (i == m_entries.end()) {
         path.reserve(nodes.size());
         for (Chain::const_reverse_iterator k = nodes.rbegin(), kend=nodes.rend(); k != kend; ++k) {
           node = *(k);
@@ -167,7 +168,7 @@ namespace {
                    (void*)code, Geant4GeometryInfo::placementPath(path).c_str());
           if (m_geo.g4Paths.find(path) == m_geo.g4Paths.end()) {
             m_geo.g4Paths[path] = code;
-            s_entries.emplace(code);
+            m_entries.emplace(code,path);
             return;
           }
           printout(ERROR, "Geant4VolumeManager", "populate: Severe error: Duplicated Geant4 path!!!! %s %s",
@@ -184,8 +185,8 @@ namespace {
                " [THIS SHOULD NEVER HAPPEN]", code);
 
     Err:
-      if ( i != s_entries.end() )
-        printout(ERROR,"Geant4VolumeManager"," Known G4 vid: %016X",*i);
+      if ( i != m_entries.end() )
+        printout(ERROR,"Geant4VolumeManager"," Known G4 path: %s",Geant4GeometryInfo::placementPath((*i).second).c_str());
       if ( !path.empty() )
         printout(ERROR,"Geant4VolumeManager"," New   G4 path: %s",Geant4GeometryInfo::placementPath(path).c_str());
       if ( !nodes.empty() )
