@@ -264,8 +264,12 @@ void Geant4VolumeManager::volumeDescriptor(const vector<const G4VPhysicalVolume*
   vol_desc.second.clear();
   vol_desc.first = NonExisting;
   if (!path.empty() && checkValidity()) {
+    vector<const G4VPhysicalVolume*> encode_path;
+    for (const auto& p : path)
+      if (p->GetName()[0] != '~')
+        encode_path.emplace_back(p);
     const auto& mapping = ptr()->g4Paths;
-    auto i = mapping.find(path);
+    auto i = mapping.find(encode_path);
     if (i != mapping.end()) {
       VolumeID vid = (*i).second;
       G4LogicalVolume* lvol = path[0]->GetLogicalVolume();
