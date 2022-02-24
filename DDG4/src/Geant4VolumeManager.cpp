@@ -110,7 +110,15 @@ namespace {
       Geant4GeometryInfo::Geant4PlacementPath path;
       Readout ro = sd.readout();
       IDDescriptor iddesc = ro.idSpec();
-      VolumeID code = iddesc.encode(ids);
+      PlacedVolume::VolIDs encode_ids;
+      bool is_virtual = false;
+      for (const auto& id : ids) {
+        if (id.first[0] != '~')
+          encode_ids.emplace_back(id);
+        else
+          is_virtual = true;
+      }
+      VolumeID code = iddesc.encode(encode_ids);
       Registries::const_iterator i = m_entries.find(code);
       PrintLevel print_level  = m_geo.printLevel;
       PrintLevel print_action = print_level;
@@ -126,9 +134,11 @@ namespace {
           node = *(k);
           PlacementMap::const_iterator g4pit = m_geo.g4Placements.find(node);
           if (g4pit != m_geo.g4Placements.end()) {
-            path.emplace_back((*g4pit).second);
-            printout(print_chain, "Geant4VolumeManager", "+++     Chain: Node OK: %s [%s]",
-                     node->GetName(), (*g4pit).second->GetName().c_str());
+            if ((*g4pit).first->GetName()[0] != '~') {
+              path.emplace_back((*g4pit).second);
+              printout(print_chain, "Geant4VolumeManager", "+++     Chain: Node OK: %s [%s]",
+                       node->GetName(), (*g4pit).second->GetName().c_str());
+            }
             continue;
           }
           control.insert(control.begin(),node);
@@ -169,6 +179,8 @@ namespace {
                  int(control.size()),detail::tools::placementPath(control,true).c_str());
         goto Err;
       }
+      else if (is_virtual)
+        return;
       printout(ERROR, "Geant4VolumeManager", "populate: Severe error: Duplicated Volume entry: 0x%X"
                " [THIS SHOULD NEVER HAPPEN]", code);
 
@@ -221,8 +233,12 @@ bool Geant4VolumeManager::checkValidity() const {
 /// Access CELLID by placement path
 VolumeID Geant4VolumeManager::volumeID(const vector<const G4VPhysicalVolume*>& path) const {
   if (!path.empty() && checkValidity()) {
+    vector<const G4VPhysicalVolume*> encode_path;
+    for (const auto& p : path)
+      if (p->GetName()[0] != '~')
+        encode_path.emplace_back(p);
     const auto& mapping = ptr()->g4Paths;
-    auto i = mapping.find(path);
+    auto i = mapping.find(encode_path);
     if (i != mapping.end())
       return (*i).second;
     if (!path[0])
@@ -248,8 +264,12 @@ void Geant4VolumeManager::volumeDescriptor(const vector<const G4VPhysicalVolume*
   vol_desc.second.clear();
   vol_desc.first = NonExisting;
   if (!path.empty() && checkValidity()) {
+    vector<const G4VPhysicalVolume*> encode_path;
+    for (const auto& p : path)
+      if (p->GetName()[0] != '~')
+        encode_path.emplace_back(p);
     const auto& mapping = ptr()->g4Paths;
-    auto i = mapping.find(path);
+    auto i = mapping.find(encode_path);
     if (i != mapping.end()) {
       VolumeID vid = (*i).second;
       G4LogicalVolume* lvol = path[0]->GetLogicalVolume();
